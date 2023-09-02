@@ -304,6 +304,8 @@ std::vector<std::pair<std::string, backend>> findPlugins() {
     PluginNames.emplace_back(__SYCL_UR_PLUGIN_NAME, backend::all);
     PluginNames.emplace_back(__SYCL_NATIVE_CPU_PLUGIN_NAME,
                              backend::ext_native_cpu);
+    PluginNames.emplace_back(__SYCL_SCYTHE_PLUGIN_NAME, backend::ext_scythe);
+    
   } else if (FilterList) {
     std::vector<device_filter> Filters = FilterList->get();
     bool OpenCLFound = false;

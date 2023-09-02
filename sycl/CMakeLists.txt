@@ -305,6 +305,9 @@ add_custom_target(sycl-compiler
           file-table-tform
           llc
           llvm-ar
+          llvm-as
+          llvm-dis
+          llvm-diff
           llvm-foreach
           llvm-spirv
           llvm-link
@@ -392,6 +395,9 @@ set( SYCL_TOOLCHAIN_DEPLOY_COMPONENTS
      file-table-tform
      llc
      llvm-ar
+     llvm-as
+     llvm-dis
+     llvm-diff
      llvm-foreach
      llvm-spirv
      llvm-link

@@ -32,13 +32,14 @@ if(NOT DEFINED LLVM_TOOL_SPIRV_HEADERS_BUILD AND
   set(LLVM_EXTERNAL_SPIRV_HEADERS_SOURCE_DIR
     "${CMAKE_CURRENT_BINARY_DIR}/SPIRV-Headers")
   message(STATUS "SPIR-V Headers location is not specified. Will try to download
-          spirv.hpp from https://github.com/KhronosGroup/SPIRV-Headers into
+          spirv.hpp from https://github.com/sidsahay/SPIRV-Headers into
           ${LLVM_EXTERNAL_SPIRV_HEADERS_SOURCE_DIR}")
-  file(READ spirv-headers-tag.conf SPIRV_HEADERS_TAG)
+  #file(READ spirv-headers-tag.conf SPIRV_HEADERS_TAG)
+  set(SPIRV_HEADERS_TAG "current-intelfix")
   # Strip the potential trailing newline from tag
   string(STRIP "${SPIRV_HEADERS_TAG}" SPIRV_HEADERS_TAG)
   FetchContent_Declare(spirv-headers
-    GIT_REPOSITORY    https://github.com/KhronosGroup/SPIRV-Headers.git
+    GIT_REPOSITORY    https://github.com/sidsahay/SPIRV-Headers.git
     GIT_TAG           ${SPIRV_HEADERS_TAG}
     SOURCE_DIR ${LLVM_EXTERNAL_SPIRV_HEADERS_SOURCE_DIR}
   )

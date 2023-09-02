@@ -231,6 +231,10 @@ isDeviceBinaryTypeSupported(const context &C,
   if (ContextBackend == backend::ext_oneapi_cuda)
     return false;
 
+  // Scythe does support SPIR-V
+  if (ContextBackend == backend::ext_scythe)
+    return true;
+
   std::vector<device> Devices = C.get_devices();
 
   // Program type is SPIR-V, so we need a device compiler to do JIT.

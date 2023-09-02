@@ -50,7 +50,7 @@ def do_configure(args):
     llvm_enable_sphinx = 'OFF'
     llvm_build_shared_libs = 'OFF'
     llvm_enable_lld = 'OFF'
-    sycl_enabled_plugins = ["opencl"]
+    sycl_enabled_plugins = ["opencl", "scythe"]
 
     sycl_enable_xpti_tracing = 'ON'
     xpti_enable_werror = 'OFF'
@@ -159,6 +159,8 @@ def do_configure(args):
         "-DLIBCLC_GENERATE_REMANGLED_VARIANTS={}".format(libclc_gen_remangled_variants),
         "-DSYCL_BUILD_PI_HIP_PLATFORM={}".format(sycl_build_pi_hip_platform),
         "-DLLVM_BUILD_TOOLS=ON",
+        "-DLLVM_TOOL_LLVM_DIS_BUILD=ON",
+        "-DLLVM_TOOL_LLVM_AS_BUILD=ON",
         "-DSYCL_ENABLE_WERROR={}".format(sycl_werror),
         "-DCMAKE_INSTALL_PREFIX={}".format(install_dir),
         "-DSYCL_INCLUDE_TESTS=ON", # Explicitly include all kinds of SYCL tests.
