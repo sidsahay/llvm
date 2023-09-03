@@ -32,8 +32,6 @@
 #include <vector>
 #include <fstream>
 
-#include "spirv-tools/libspirv.hpp"
-
 #define SCYTHE_DEBUG
 
 #ifdef SCYTHE_DEBUG
@@ -363,12 +361,10 @@ pi_result piextQueueCreateWithNativeHandle(pi_native_handle nativeHandle,
 pi_result piProgramCreate(pi_context context, const void *il, size_t length,
                           pi_program *res_program) {
                             S
-                            // TODO
-  // since we don't manage the memory of il, make a new buffer
-  // and just send the spirv right back. The spirv execution
-  // engine will take care of actually executing the thing.
-  auto program = new ScytheProgram(length, il);
-  *res_program = reinterpret_cast<pi_program>(program);
+  *res_program = new _pi_program(il, length);
+  std::ofstream out("dump.spv", std::ios::binary);
+  out.write(static_cast<const char*>(il), length);
+  out.close();
   return PI_SUCCESS;
 }
 
@@ -1343,11 +1339,8 @@ return PI_ERROR_INVALID_OPERATION;
 
 pi_result piProgramBuild(pi_program program, pi_uint32 num_devices, const pi_device *device_list, const char *options, void (*pfn_notify)(pi_program program, void *user_data), void *user_data) {
   S
-  // TODO
-  // we don't actually need to do anything since the execution
-  // engine will just interpret spirv
-  // pi_program can remain as is
-return PI_SUCCESS;
+  program->build();
+  return PI_SUCCESS;
 }
 
 pi_result piProgramGetBuildInfo(pi_program program, pi_device device, _pi_program_build_info param_name, size_t param_value_size, void *param_value, size_t *param_value_size_ret) {

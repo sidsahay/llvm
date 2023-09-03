@@ -16,6 +16,8 @@ add_sycl_plugin(scythe
     "pi_scythe.cpp"
   LIBRARIES
     #OpenCL-ICD
+    SPIRV-Headers
+    SPIRV-Tools
 )
 
 set_target_properties(pi_scythe PROPERTIES LINKER_LANGUAGE CXX)

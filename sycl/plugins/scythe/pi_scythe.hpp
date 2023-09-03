@@ -8,6 +8,8 @@
 #include <regex>
 #include <string>
 
+#include <spire.hpp>
+
 // This version should be incremented for any change made to this file or its
 // corresponding .cpp file.
 #define _PI_SCYTHE_PLUGIN_VERSION 1
@@ -35,19 +37,23 @@ struct _pi_mem {
   size_t size;
 };
 
-// TODO: rename to _pi_program
-struct ScytheProgram {
-  size_t length;
-  uint8_t* bytes;
+struct _pi_program {
+  spire::Program program;
+  int refcount;
 
-  ScytheProgram(size_t spirv_length, const void* spirv_bytes) 
-    : length(spirv_length) {
-      bytes = new uint8_t[length];
-      memcpy(bytes, spirv_bytes, length);
+  _pi_program(const void* il, size_t length) 
+    : program(il, length), refcount(1) {}
+
+  int inc_ref() {
+    return ++refcount;
   }
 
-  ~ScytheProgram() {
-    delete[] bytes;
+  int dec_ref() {
+    return --refcount;
+  }
+
+  void build() {
+    program.parse_and_build();
   }
 };
 
