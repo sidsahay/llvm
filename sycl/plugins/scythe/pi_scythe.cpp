@@ -35,7 +35,7 @@
 #define SCYTHE_DEBUG
 
 #ifdef SCYTHE_DEBUG
-  #define S {std::cerr << "[Log] " << __FUNCTION__ << std::endl; }
+  #define S {std::cerr << "\n[Log] " << __FUNCTION__ << std::endl; }
 #else
   #define S {}
 #endif
@@ -332,6 +332,8 @@ pi_result piextQueueCreate(pi_context Context, pi_device Device,
                            pi_queue_properties *Properties, pi_queue *Queue) {
                             S
                             // TODO
+                            // why
+  *Queue = new _pi_queue(Context);
   return PI_SUCCESS;
 }
 
@@ -339,6 +341,7 @@ pi_result piQueueCreate(pi_context context, pi_device device,
                         pi_queue_properties properties, pi_queue *queue) {
                           S
                           // TODO
+  *queue = new _pi_queue(context);
   return PI_SUCCESS;
 }
 
@@ -361,7 +364,7 @@ pi_result piextQueueCreateWithNativeHandle(pi_native_handle nativeHandle,
 pi_result piProgramCreate(pi_context context, const void *il, size_t length,
                           pi_program *res_program) {
                             S
-  *res_program = new _pi_program(il, length);
+  *res_program = new _pi_program(context, il, length);
   std::ofstream out("dump.spv", std::ios::binary);
   out.write(static_cast<const char*>(il), length);
   out.close();
@@ -392,8 +395,8 @@ pi_result piextKernelSetArgMemObj(pi_kernel kernel, pi_uint32 arg_index,
     std::cerr << "Null arg!\n";
   }
   else {
-    std::cerr << "MemObj Id: " << (*arg_value)->id << "\n";
-    std::cerr << "MemObj Size: " << (*arg_value)->size << "\n";
+    std::cerr << "MemObj Id: " << (*arg_value)->mem.id << "\n";
+    std::cerr << "MemObj Size: " << (*arg_value)->mem.size << "\n";
   }
 
   const pi_mem_obj_property* properties = arg_properties;
@@ -401,6 +404,8 @@ pi_result piextKernelSetArgMemObj(pi_kernel kernel, pi_uint32 arg_index,
     std::cerr << "Mem Access: " << properties->mem_access << "\n";
     properties = reinterpret_cast<const pi_mem_obj_property*>(properties->pNext);
   }
+
+  kernel->bind_membuffer_arg(arg_index, (*arg_value)->mem.id);
 
   return PI_SUCCESS;
 }
@@ -434,6 +439,7 @@ pi_result piContextCreate(const pi_context_properties *properties,
                           void *user_data, pi_context *retcontext) {
                             S                            
                             // TODO
+ *retcontext = new _pi_context();
  return PI_SUCCESS;
 }
 
@@ -459,12 +465,11 @@ pi_result piMemBufferCreate(pi_context context, pi_mem_flags flags, size_t size,
                               S
                               // TODO
   std::cout << "[piMemBufferCreate] size " << size;
-  auto mem = new _pi_mem;
-  mem->id = blah::buffer_count;
-  blah::buffer_count++;
-  mem->size = size;
-  // TODO add flags
-  std::cerr << "Mem Id: " << mem->id << std::endl;
+  auto mem = new _pi_mem();
+  context->memories.push_back(mem);
+  auto mem_idx = context->memories.size() - 1;
+  mem->set(mem_idx, size);
+  std::cerr << "Mem Id: " << mem->mem.id << std::endl;
   *ret_mem = mem;
   return PI_SUCCESS;
 }
@@ -536,7 +541,7 @@ pi_result piKernelCreate(pi_program program, const char *kernel_name,
   // so we can build individual kernels out of a given program
   // will have to figure this out later
   // currently, simple.spv only has one kernel so the whole program becomes the kernel
-  *ret_kernel = reinterpret_cast<pi_kernel>(program);
+  *ret_kernel = new _pi_kernel(program);
   return PI_SUCCESS;
 }
 
@@ -1413,11 +1418,13 @@ pi_result piSamplerRelease(pi_sampler sampler) {
   S
 return PI_ERROR_INVALID_OPERATION;
 }
+
 pi_result piEnqueueKernelLaunch(pi_queue queue, pi_kernel kernel, pi_uint32 work_dim, const size_t *global_work_offset, const size_t *global_work_size, const size_t *local_work_size, pi_uint32 num_events_in_wait_list, const pi_event *event_wait_list, pi_event *event) {
   S
-  // TODO
-return PI_SUCCESS;
+  run_on_spire(kernel);
+  return PI_SUCCESS;
 }
+
 pi_result piEnqueueNativeKernel(pi_queue queue, void (*user_func)(void *), void *args, size_t cb_args, pi_uint32 num_mem_objects, const pi_mem *mem_list, const void **args_mem_loc, pi_uint32 num_events_in_wait_list, const pi_event *event_wait_list, pi_event *event) {
   S
 return PI_ERROR_INVALID_OPERATION;
@@ -1433,15 +1440,17 @@ return PI_ERROR_INVALID_OPERATION;
 
 pi_result piEnqueueMemBufferRead(pi_queue queue, pi_mem buffer, pi_bool blocking_read, size_t offset, size_t size, void *ptr, pi_uint32 num_events_in_wait_list, const pi_event *event_wait_list, pi_event *event) {
   S
-  std::cerr << "Buffer ID: " << buffer->id << std::endl;
-  std::cerr << "Buffer Size: " << buffer->size << std::endl;
+  std::cerr << "Buffer ID: " << buffer->mem.id << std::endl;
+  std::cerr << "Buffer Size: " << buffer->mem.size << std::endl;
   std::cerr << "Ptr: " << ptr << std::endl;
   std::cerr << "Blocking: " << blocking_read << std::endl;
   std::cerr << "Offset: " << offset << std::endl;
   std::cerr << "Size: " << size << std::endl;
-  auto items = reinterpret_cast<int*>(ptr);
-  for (int i = 0; i < 8; i++) {
-    items[i] = i;
+  std::cerr << "Context: " << queue->context << std::endl;
+  uint8_t* mem_ptr = queue->context->memory_area[buffer->mem.id].data();
+  uint8_t* dst_ptr = reinterpret_cast<uint8_t*>(ptr);
+  for (int i = 0; i < size; i++) {
+    dst_ptr[i] = mem_ptr[i];
   }
   return PI_SUCCESS;
 }

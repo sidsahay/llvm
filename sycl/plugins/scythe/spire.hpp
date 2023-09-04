@@ -329,12 +329,19 @@ struct SpirvVariable {
     }
 };
 
+// -1 id is invalid
+struct MemBuffer {
+    int id;
+    size_t size;
+};
+
 struct SpirvFunctionParameter {
     SpirvId result_type;
     SpirvId result_id;
+    int mem_buffer_id;
 
-    SpirvFunctionParameter() : result_type(0), result_id(0) {}
-    SpirvFunctionParameter(SpirvId ty, SpirvId id) : result_type(ty), result_id(id) {}
+    SpirvFunctionParameter() : result_type(0), result_id(0), mem_buffer_id(-1) {}
+    SpirvFunctionParameter(SpirvId ty, SpirvId id) : result_type(ty), result_id(id), mem_buffer_id(-1) {}
 
     std::ostream& operator<<(std::ostream& out) {
         out << "SpirvFunctionParameter(" << result_type << ", " << result_id << ")";
@@ -364,13 +371,22 @@ struct SpirvFunction {
     }
 };
 
+
 struct Program;
+
+struct SpirvValue {
+  SpirvId type_id;
+  SpirvId id;
+  uint64_t direct;
+  std::vector<uint32_t> variable;
+};
 
 struct Kernel {
     std::string name;
     SpirvId entry_point_id;
     SpirvFunction function;
     Program* program;
+    
     Kernel() {}
     Kernel(Program* p) : program(p) {}
 };
@@ -688,7 +704,7 @@ struct Program {
                         auto num_blocks = (inst.num_words - 3)/2;
                         std::vector<std::pair<SpirvId, SpirvId>> blocks;
                         for (int i = 0; i < num_blocks; i++) {
-                            int offset = 3 + 2*num_blocks;
+                            int offset = 3 + 2*i;
                             blocks.push_back({inst.words[offset], inst.words[offset+1]});
                         }
                         auto& fn = kernels[current_fn].function;
@@ -706,7 +722,7 @@ struct Program {
                         result_type = inst.words[1];
                         result_id = inst.words[2];
                         op1 = inst.words[3];
-                        op1 = inst.words[4];
+                        op2 = inst.words[4];
                         auto& fn = kernels[current_fn].function;
                         fn.code.push_back(impl::ULessThan(result_type, result_id, op1, op2));
                     }
@@ -771,7 +787,7 @@ struct Program {
                         result_type = inst.words[1];
                         result_id = inst.words[2];
                         op1 = inst.words[3];
-                        op1 = inst.words[4];
+                        op2 = inst.words[4];
                         auto& fn = kernels[current_fn].function;
                         fn.code.push_back(impl::IAdd(result_type, result_id, op1, op2));
                     }
@@ -826,10 +842,6 @@ struct Program {
 };
 
 struct Queue {
-
-};
-
-struct MemBuffer {
 
 };
 
