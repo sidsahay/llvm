@@ -43,10 +43,25 @@
 // very useful getInfo template from HIP plugin
 namespace blah {
 
+void wait_for_events(pi_uint32 num_events_in_wait_list, const pi_event *event_wait_list) {
+  std::cout << "Num events waiting: " << num_events_in_wait_list << std::endl; 
+  for (int i = 0; i < num_events_in_wait_list; i++) {
+    if (event_wait_list[i]->is_buffer) {
+      // handle buffer events - currently do nothing since we don't async
+      continue;
+    }
+    else {
+      size_t kernel_id = event_wait_list[i]->kernel_id;
+      std::cerr << "waiting on event for kernel " << kernel_id << std::endl;
+      spire::global_interpreter.wait(kernel_id);
+    }
+  }
+}
   // buffer counter so that we can ID and release membuffers
   static int buffer_count = 0;
 
-  template <typename T, typename Assign>
+// super helpful templates copied from HIP plugin
+template <typename T, typename Assign>
 pi_result getInfoImpl(size_t param_value_size, void *param_value,
                       size_t *param_value_size_ret, T value, size_t value_size,
                       Assign &&assign_func) {
@@ -406,7 +421,7 @@ pi_result piextKernelSetArgMemObj(pi_kernel kernel, pi_uint32 arg_index,
   }
 
   kernel->bind_membuffer_arg(arg_index, (*arg_value)->mem.id);
-
+  
   return PI_SUCCESS;
 }
 
@@ -466,11 +481,13 @@ pi_result piMemBufferCreate(pi_context context, pi_mem_flags flags, size_t size,
                               // TODO
   std::cout << "[piMemBufferCreate] size " << size;
   auto mem = new _pi_mem();
-  context->memories.push_back(mem);
-  auto mem_idx = context->memories.size() - 1;
+  auto mem_idx = spire::mem_buffer_count;
+  spire::mem_buffer_count++;
   mem->set(mem_idx, size);
   std::cerr << "Mem Id: " << mem->mem.id << std::endl;
   *ret_mem = mem;
+  spire::global_interpreter.add_memory(&(mem->mem));
+  spire::global_interpreter.allocate_memory(mem->mem.id, mem->mem.size);
   return PI_SUCCESS;
 }
 
@@ -537,11 +554,8 @@ pi_result piProgramLink(pi_context context, pi_uint32 num_devices,
 pi_result piKernelCreate(pi_program program, const char *kernel_name,
                          pi_kernel *ret_kernel) {
                           S
-  // TODO
-  // so we can build individual kernels out of a given program
-  // will have to figure this out later
-  // currently, simple.spv only has one kernel so the whole program becomes the kernel
-  *ret_kernel = new _pi_kernel(program);
+  std::cerr << "Creating kernel " << kernel_name << std::endl;
+  *ret_kernel = new _pi_kernel(program, kernel_name);
   return PI_SUCCESS;
 }
 
@@ -1345,6 +1359,9 @@ return PI_ERROR_INVALID_OPERATION;
 pi_result piProgramBuild(pi_program program, pi_uint32 num_devices, const pi_device *device_list, const char *options, void (*pfn_notify)(pi_program program, void *user_data), void *user_data) {
   S
   program->build();
+  spire::global_interpreter.load_program(&(program->program));
+  spire::global_interpreter.load_constants();
+  spire::global_interpreter.load_variables();
   return PI_SUCCESS;
 }
 
@@ -1387,7 +1404,8 @@ return PI_ERROR_INVALID_OPERATION;
 }
 pi_result piEventsWait(pi_uint32 num_events, const pi_event *event_list) {
   S
-return PI_ERROR_INVALID_OPERATION;
+  blah::wait_for_events(num_events, event_list);
+  return PI_SUCCESS;
 }
 pi_result piEventSetCallback(pi_event event, pi_int32 command_exec_callback_type, void (*pfn_notify)(pi_event event, pi_int32 event_command_status, void *user_data), void *user_data) {
   S
@@ -1403,7 +1421,8 @@ return PI_ERROR_INVALID_OPERATION;
 }
 pi_result piEventRelease(pi_event event) {
   S
-return PI_ERROR_INVALID_OPERATION;
+  delete event;
+  return PI_SUCCESS;
 }
 
 pi_result piSamplerGetInfo(pi_sampler sampler, pi_sampler_info param_name, size_t param_value_size, void *param_value, size_t *param_value_size_ret) {
@@ -1421,7 +1440,12 @@ return PI_ERROR_INVALID_OPERATION;
 
 pi_result piEnqueueKernelLaunch(pi_queue queue, pi_kernel kernel, pi_uint32 work_dim, const size_t *global_work_offset, const size_t *global_work_size, const size_t *local_work_size, pi_uint32 num_events_in_wait_list, const pi_event *event_wait_list, pi_event *event) {
   S
-  run_on_spire(kernel);
+  blah::wait_for_events(num_events_in_wait_list, event_wait_list);
+  spire::global_interpreter.load_kernel(&(kernel->kernel));
+  std::cerr << "Allocated stuff without crashing\n";
+  spire::global_interpreter.advance_chunk(5);
+  *event = new _pi_event();
+  (*event)->kernel_id = spire::global_interpreter.kernels.size() - 1;
   return PI_SUCCESS;
 }
 
@@ -1440,18 +1464,14 @@ return PI_ERROR_INVALID_OPERATION;
 
 pi_result piEnqueueMemBufferRead(pi_queue queue, pi_mem buffer, pi_bool blocking_read, size_t offset, size_t size, void *ptr, pi_uint32 num_events_in_wait_list, const pi_event *event_wait_list, pi_event *event) {
   S
-  std::cerr << "Buffer ID: " << buffer->mem.id << std::endl;
-  std::cerr << "Buffer Size: " << buffer->mem.size << std::endl;
-  std::cerr << "Ptr: " << ptr << std::endl;
-  std::cerr << "Blocking: " << blocking_read << std::endl;
-  std::cerr << "Offset: " << offset << std::endl;
-  std::cerr << "Size: " << size << std::endl;
-  std::cerr << "Context: " << queue->context << std::endl;
-  uint8_t* mem_ptr = queue->context->memory_area[buffer->mem.id].data();
+  blah::wait_for_events(num_events_in_wait_list, event_wait_list);
+  uint8_t* mem_ptr = spire::global_interpreter.memory_area[buffer->mem.id].data();
   uint8_t* dst_ptr = reinterpret_cast<uint8_t*>(ptr);
   for (int i = 0; i < size; i++) {
     dst_ptr[i] = mem_ptr[i];
   }
+
+  *event = new _pi_event(true);
   return PI_SUCCESS;
 }
 
@@ -1459,10 +1479,20 @@ pi_result piEnqueueMemBufferReadRect(pi_queue command_queue, pi_mem buffer, pi_b
   S
 return PI_ERROR_INVALID_OPERATION;
 }
+
 pi_result piEnqueueMemBufferWrite(pi_queue command_queue, pi_mem buffer, pi_bool blocking_write, size_t offset, size_t size, const void *ptr, pi_uint32 num_events_in_wait_list, const pi_event *event_wait_list, pi_event *event) {
   S
-return PI_ERROR_INVALID_OPERATION;
+  blah::wait_for_events(num_events_in_wait_list, event_wait_list);
+  uint8_t* dst_ptr = spire::global_interpreter.memory_area[buffer->mem.id].data();
+  const uint8_t* src_ptr = reinterpret_cast<const uint8_t*>(ptr);
+  for (int i = 0; i < size; i++) {
+    dst_ptr[i] = src_ptr[i];
+  }
+
+  *event = new _pi_event(true);
+  return PI_SUCCESS;
 }
+
 pi_result piEnqueueMemBufferWriteRect(pi_queue command_queue, pi_mem buffer, pi_bool blocking_write, pi_buff_rect_offset buffer_offset, pi_buff_rect_offset host_offset, pi_buff_rect_region region, size_t buffer_row_pitch, size_t buffer_slice_pitch, size_t host_row_pitch, size_t host_slice_pitch, const void *ptr, pi_uint32 num_events_in_wait_list, const pi_event *event_wait_list, pi_event *event) {
   S
 return PI_ERROR_INVALID_OPERATION;
